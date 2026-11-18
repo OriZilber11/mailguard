@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="670" viewBox="0 0 1280 670" role="img" aria-label="MailGuard architecture: the Gmail add-on in Google Workspace calls the FastAPI backend through an HTTPS tunnel; the backend authenticates, parses, runs six analyzers, an optional LLM review and the scoring engine, and returns the result to the add-on card. External services: Google public keys, OpenPhish feed, blocklists and the Anthropic API.">
+    <style>
+:root{--bg:#F4F5F1;--surface:#FFFFFF;--ink:#0F1B2D;--mute:#5A6676;--line:#C9CFC6;--accent:#0B7A85;--band:#E8ECE6;
+--font-head:Arial,Helvetica,sans-serif;--font-body:Inter,Arial,Helvetica,sans-serif}
+@media (prefers-color-scheme: dark){:root{--bg:#0E1621;--surface:#162232;--ink:#E8EDF3;--mute:#A9B6C6;--line:#34465B;--accent:#6FD0D6;--band:#1A2A3D}}
+
+.zone { fill: var(--band); }
+.zt { font: 700 12px var(--font-body); letter-spacing: .09em; fill: var(--accent); }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.opt { stroke: var(--mute); stroke-dasharray: 5 4; }
+.core { fill: var(--ink); stroke: none; }
+.t { font: 600 13px var(--font-body); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.tc { fill: var(--bg); }
+.gt { font: 600 12px var(--font-body); fill: var(--mute); }
+.arrow { stroke: var(--mute); stroke-width: 1.7; fill: none; marker-end: url(#ah); }
+.arrow.both { marker-start: url(#ahs); }
+.arrow.dash { stroke-dasharray: 5 4; }
+.ahp { fill: var(--mute); }
+.lbl { font: 500 11.5px var(--font-body); fill: var(--mute); text-anchor: middle; }
+.leg { font: 500 12px var(--font-body); fill: var(--mute); dominant-baseline: central; }
+</style>
+<defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="ahp"/></marker>
+      <marker id="ahs" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M10 0 L0 5 L10 10 z" class="ahp"/></marker>
+    </defs>
+<rect width="1280" height="670" style="fill:var(--surface)"/>
+
+    <!-- zones -->
+    <rect class="zone" x="20" y="60" width="290" height="540" rx="14"/>
+    <text class="zt" x="38" y="84">GOOGLE WORKSPACE</text>
+    <rect class="zone" x="530" y="60" width="340" height="540" rx="14"/>
+    <text class="zt" x="548" y="84">MAILGUARD BACKEND (FASTAPI)</text>
+    <rect class="zone" x="900" y="60" width="350" height="540" rx="14"/>
+    <text class="zt" x="918" y="84">EXTERNAL SERVICES AND DATA</text>
+
+    <!-- Google Workspace: Gmail and the add-on -->
+    <rect class="box" x="80" y="100" width="180" height="46" rx="8"/><text class="t" x="170" y="123">Gmail</text>
+    <rect class="box" x="80" y="172" width="180" height="46" rx="8"/><text class="t" x="170" y="195">Trigger: open email</text>
+    <rect class="box" x="80" y="244" width="180" height="46" rx="8"/><text class="t" x="170" y="267">Extract message</text>
+    <rect class="box" x="80" y="316" width="180" height="46" rx="8"/><text class="t" x="170" y="339">API client</text>
+    <rect class="box" x="80" y="388" width="180" height="46" rx="8"/><text class="t" x="170" y="411">Card in Gmail sidebar</text>
+    <rect class="box" x="80" y="500" width="180" height="46" rx="8"/><text class="t" x="170" y="523">Google Identity</text>
+    <path class="arrow" d="M170 146 V172"/><path class="arrow" d="M170 218 V244"/>
+    <path class="arrow" d="M170 290 V316"/><path class="arrow" d="M170 362 V388"/>
+    <path class="arrow" d="M80 523 H52 V339 H78"/>
+    <text class="lbl" transform="rotate(-90 40 431)" x="40" y="431">ID token</text>
+
+    <!-- tunnel -->
+    <text class="lbl" x="410" y="303">public HTTPS</text>
+    <rect class="box opt" x="360" y="314" width="100" height="50" rx="8"/><text class="t" x="410" y="339">ngrok tunnel</text>
+    <path class="arrow" d="M260 329 H358"/>
+    <path class="arrow" d="M360 349 H262"/>
+    <path class="arrow" d="M460 329 H490 V123 H598"/>
+    <text class="lbl" x="545" y="113">HTTPS + ID token</text>
+    <path class="arrow" d="M600 541 H510 V349 H462"/>
+    <text class="lbl" x="555" y="531">Result (JSON)</text>
+
+    <!-- backend pipeline -->
+    <rect class="box" x="600" y="100" width="200" height="46" rx="8"/><text class="t" x="700" y="123">Auth gate</text>
+    <rect class="box" x="600" y="176" width="200" height="46" rx="8"/><text class="t" x="700" y="199">Parser</text>
+    <rect class="box" x="544" y="252" width="312" height="165" rx="10"/>
+    <text class="gt" x="560" y="270">Analyzers</text>
+    <rect class="box" x="560" y="284" width="130" height="34" rx="6"/><text class="t" x="625" y="301">Authentication</text>
+    <rect class="box" x="710" y="284" width="130" height="34" rx="6"/><text class="t" x="775" y="301">Sender</text>
+    <rect class="box" x="560" y="326" width="130" height="34" rx="6"/><text class="t" x="625" y="343">Links</text>
+    <rect class="box" x="710" y="326" width="130" height="34" rx="6"/><text class="t" x="775" y="343">Attachments</text>
+    <rect class="box" x="560" y="368" width="130" height="34" rx="6"/><text class="t" x="625" y="385">Content</text>
+    <rect class="box" x="710" y="368" width="130" height="34" rx="6"/><text class="t" x="775" y="385">Reputation</text>
+    <rect class="box opt" x="600" y="442" width="200" height="46" rx="8"/><text class="t" x="700" y="465">LLM review</text>
+    <rect class="core" x="600" y="518" width="200" height="46" rx="8"/><text class="t tc" x="700" y="541">Scoring engine</text>
+    <path class="arrow" d="M700 146 V176"/><path class="arrow" d="M700 222 V252"/>
+    <path class="arrow" d="M700 417 V442"/><path class="arrow" d="M700 488 V518"/>
+
+    <!-- external services and data -->
+    <rect class="box" x="950" y="100" width="240" height="46" rx="8"/><text class="t" x="1070" y="123">Google public keys</text>
+    <rect class="box opt" x="950" y="210" width="240" height="46" rx="8"/><text class="t" x="1070" y="233">OpenPhish feed</text>
+    <rect class="box" x="950" y="362" width="240" height="46" rx="8"/><text class="t" x="1070" y="385">Blocklists</text>
+    <rect class="box opt" x="950" y="442" width="240" height="46" rx="8"/><text class="t" x="1070" y="465">Anthropic API</text>
+    <path class="arrow" d="M800 123 H948"/><text class="lbl" x="874" y="113">verify token</text>
+    <path class="arrow" d="M840 385 H948"/><text class="lbl" x="894" y="375">lookup</text>
+    <path class="arrow both dash" d="M800 465 H948"/><text class="lbl" x="874" y="455">optional</text>
+    <path class="arrow dash" d="M1070 256 V360"/><text class="gt" x="1082" y="312">refresh script</text>
+
+    <!-- legend -->
+    <path class="arrow" d="M40 632 H90"/><text class="leg" x="100" y="632">every open</text>
+    <path class="arrow dash" d="M220 632 H270"/><text class="leg" x="280" y="632">optional or offline</text>
+  </svg>
