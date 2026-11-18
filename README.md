@@ -54,19 +54,38 @@ With `ANTHROPIC_API_KEY` set, the subject and the first 4 KB of the body (emails
 the Anthropic API. Unset the key, or set `LLM_ENABLED=false`, to turn this off.
 
 ## Run it
-```bash
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q                       # 68 tests
-GOOGLE_AUDIENCE=<oauth-client-id> .venv/bin/uvicorn app.main:app --port 8080
-ngrok http --url=<your-domain> 8080                 # public HTTPS for Gmail
-```
-Add-on: create a project at script.google.com, paste the files from `addon/`, set the Script property
-`BACKEND_URL`, put the same URL in `urlFetchWhitelist` in `appsscript.json`, then
-Deploy → Test deployments → install. `GOOGLE_AUDIENCE` is the `aud` value of
-`ScriptApp.getIdentityToken()` (decode the token's middle part and read `aud`).
+Prerequisites: Python 3.10+, [ngrok](https://ngrok.com) (a free static domain), a Gmail account.
+All commands run from the `backend/` folder unless noted.
 
-Optional: `python3 backend/scripts/update_feeds.py` refreshes the blocklist from the OpenPhish public feed.
+1. **Install and test the backend**
+   ```bash
+   cd backend
+   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+   .venv/bin/python -m pytest -q          # 68 tests
+   ```
+2. **Open a public HTTPS tunnel** (Gmail can only call public URLs), in a second terminal:
+   ```bash
+   ngrok http --url=<your-domain> 8080
+   ```
+3. **Install the add-on.** Create a project at script.google.com and paste the files from `addon/`.
+   Set the Script property `BACKEND_URL` and the `urlFetchWhitelist` in `appsscript.json` to your tunnel URL.
+   Then Deploy → Test deployments → install.
+4. **Get the audience** (the OAuth client ID the tokens are issued for): run this once in the Apps Script editor
+   and copy the logged value.
+   ```javascript
+   function showAud() {
+     const p = ScriptApp.getIdentityToken().split(".")[1];
+     Logger.log(JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(p)).getDataAsString()).aud);
+   }
+   ```
+5. **Start the backend**
+   ```bash
+   GOOGLE_AUDIENCE=<audience-from-step-4> .venv/bin/uvicorn app.main:app --port 8080
+   ```
+6. Open any email in Gmail. The MailGuard card appears in the side panel.
+
+Optional: `ANTHROPIC_API_KEY=<key>` (set in step 5) enables the LLM summary.
+`python3 scripts/update_feeds.py` refreshes the blocklist from the OpenPhish public feed.
 
 ## Demo emails
 | Email | Result |
@@ -89,4 +108,4 @@ Optional: `python3 backend/scripts/update_feeds.py` refreshes the blocklist from
 
 ## Layout
 `addon/` Apps Script add-on · `backend/app/` API, analyzers, scoring · `backend/tests/` tests ·
-`design.md` the fuller design document
+`design.md` the target design (some parts are not built; this README describes what is built)
