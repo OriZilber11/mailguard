@@ -3,6 +3,9 @@
 A Gmail add-on that checks the email you have open and shows a **score (0-100)**, a **verdict**
 (Safe, Suspicious, Malicious, Inconclusive) and the **reasons** behind it.
 
+![MailGuard card for an email with a known-malicious link: Malicious, 100/100, with three findings](docs/card-malicious.png)
+*The card for a phishing-style email: a link to a blocklisted site, a password request and urgent wording.*
+
 ## How it works
 
 ```
