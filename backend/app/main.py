@@ -6,7 +6,7 @@ from app.models import AnalyzeRequest, AnalyzeResponse, Signal
 from app.parsing import ParsedMessage, parse_headers
 from app.scoring import decide
 
-ENGINE_VERSION = "2.1.0"
+ENGINE_VERSION = "2.3.0"
 
 ANALYZERS = {"authentication": authentication.analyze, "sender": sender.analyze, "links": links.analyze,
               "attachments": attachments.analyze, "content": content.analyze,
@@ -48,10 +48,11 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
 
     extra, ai_summary = llm.assess(msg, signals)  # advisory: can only add a medium signal
     signals.extend(extra)
-    verdict = decide(signals, core_failed)
+    verdict, score = decide(signals, core_failed)
     return AnalyzeResponse(
         engine_version=ENGINE_VERSION,
         verdict=verdict,
+        score=score,
         summary=ai_summary or SUMMARY[verdict],
         signals=signals,
     )

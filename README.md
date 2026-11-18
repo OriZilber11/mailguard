@@ -1,33 +1,92 @@
 # MailGuard
 
-Gmail add-on that checks the opened email with boolean pass/fail checks and shows a verdict
-(Safe, Suspicious, Malicious, Inconclusive) with the evidence behind it. All detection runs in a FastAPI backend;
-the add-on only extracts the email and renders the result.
+A Gmail add-on that checks the email you have open and shows a **score (0-100)**, a **verdict**
+(Safe, Suspicious, Malicious, Inconclusive) and the **reasons** behind it.
 
-- `design.md` - full design (see "MVP scope" for what is built now)
-- `addon/` - Google Apps Script add-on (paste files into script.google.com; set Script Property `BACKEND_URL`)
-- `backend/` - FastAPI service
+## How it works
 
-## Built so far
-- End-to-end: Gmail add-on -> HTTPS tunnel -> `POST /v1/analyze` -> card in the Gmail sidebar
-- Analyzers: authentication (SPF/DKIM/DMARC), sender (Reply-To, Return-Path, display-name spoofing)
-- Boolean verdict rules (`backend/app/scoring.py`); a failed core check gives Inconclusive, never a false Safe
-- 12 unit tests
-
-## Run the backend
 ```
+Gmail add-on  ──(HTTPS + Google sign-in token)──►  FastAPI backend
+(extract + show)  ◄────── score, verdict, reasons ──  (all the detection)
+```
+
+1. The **add-on** reads the open email and sends it to the backend. It contains no detection logic.
+2. The **backend** checks the token, runs the analyzers and applies the scoring rules.
+3. The add-on shows the result, colored by risk: 71-100 red, 31-70 amber, 0-30 green.
+
+Each analyzer looks for one kind of problem and returns **signals**: a named finding with a severity
+(`low`, `medium`, `high`, `critical`) and a plain explanation.
+
+| Analyzer | What it looks for |
+|---|---|
+| Authentication | SPF, DKIM, DMARC failures (read from the header Gmail adds) |
+| Sender | Spoofing: Reply-To or Return-Path on another domain, fake display name |
+| Links | Tricks like `user@host` URLs, IP-address links, link text that lies |
+| Attachments | Dangerous types, `invoice.pdf.exe`, a file whose contents don't match its name |
+| Content | Password or payment requests, forms, urgency, hidden text |
+| Reputation | Links or files on a local blocklist of known-bad sites and hashes |
+| LLM review (optional) | A plain-language summary and an advisory "looks like phishing" flag |
+
+## Scoring: simple yes/no rules, no math
+The first rule that is true decides both the verdict and the score, so they always agree.
+
+| If… | Verdict | Score |
+|---|---|---|
+| any critical signal | Malicious | 100 |
+| two or more high | Malicious | 90 |
+| one high | Suspicious | 60 |
+| any medium | Suspicious | 40 |
+| a core check could not run | Inconclusive | none |
+| only low | Safe | 10 |
+| nothing found | Safe | 0 |
+
+If a core check fails and nothing worse was found, the answer is **Inconclusive**, never a false Safe.
+
+## Security
+- **Only the add-on can call the API:** every request needs a valid Google token; without configuration the API refuses all requests.
+- **Attachments stay in Gmail:** only name, type, size, hash and the first 16 bytes are sent.
+- **Input is untrusted:** size limits on every field, and no link from an email is ever opened.
+- **Safe display:** all text shown in the card is escaped.
+- **LLM is advisory:** the email is treated as data, personal details are masked, and the LLM can add one medium signal at most. It can never lower a verdict.
+- **Secrets** come from environment variables, never from the repo.
+
+With `ANTHROPIC_API_KEY` set, the subject and the first 4 KB of the body (emails and phone numbers masked) go to
+the Anthropic API. Unset the key, or set `LLM_ENABLED=false`, to turn this off.
+
+## Run it
+```bash
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q
-.venv/bin/uvicorn app.main:app --port 8080
+.venv/bin/python -m pytest -q                       # 68 tests
+GOOGLE_AUDIENCE=<oauth-client-id> .venv/bin/uvicorn app.main:app --port 8080
+ngrok http --url=<your-domain> 8080                 # public HTTPS for Gmail
 ```
-Expose it with `ngrok http --url=https://<your-domain> 8080`, then set the same URL in the add-on's
-`appsscript.json` (`urlFetchWhitelist`) and the `BACKEND_URL` Script Property.
+Add-on: create a project at script.google.com, paste the files from `addon/`, set the Script property
+`BACKEND_URL`, put the same URL in `urlFetchWhitelist` in `appsscript.json`, then
+Deploy → Test deployments → install. `GOOGLE_AUDIENCE` is the `aud` value of
+`ScriptApp.getIdentityToken()` (decode the token's middle part and read `aud`).
 
-## Next
-Link analyzers, attachment checks, Google ID token auth, threat intel, LLM summary.
+Optional: `python3 backend/scripts/update_feeds.py` refreshes the blocklist from the OpenPhish public feed.
 
-## LLM review (optional)
-With `ANTHROPIC_API_KEY` set, the backend sends the subject and first 4 KB of the body (emails and phone numbers masked)
-to the Anthropic API for a plain-language summary and an advisory phishing-intent flag (adds at most one medium signal;
-never lowers a verdict). Unset the key or set `LLM_ENABLED=false` to turn it off.
+## Demo emails
+| Email | Result |
+|---|---|
+| A real receipt from a known sender | Safe |
+| "Please verify your account within 24 hours" with a PNG renamed `invoice.pdf` | Suspicious, 60 |
+| "Please verify your password: http://evil.test/login" (`evil.test` is a seeded blocklist entry) | Malicious, 100 |
+
+## Why it is built this way
+- **Rules, not machine learning:** every result can be explained, and there is no labeled data.
+- **Thin add-on:** logic in the backend is easy to test and change without redeploying the add-on.
+- **Gmail's own authentication result:** no re-checking SPF and DKIM ourselves.
+- **Local blocklist:** fast, offline, no rate limits.
+
+## Limitations
+- The blocklist is a snapshot, not live. There are no live lookups such as VirusTotal.
+- Content checks are keyword-based and can be noisy.
+- The LLM path is tested with a mocked API only.
+- It runs from a laptop through a tunnel. A real deployment needs a container, rate limiting and logging.
+
+## Layout
+`addon/` Apps Script add-on · `backend/app/` API, analyzers, scoring · `backend/tests/` tests ·
+`design.md` the fuller design document

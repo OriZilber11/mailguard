@@ -127,6 +127,7 @@ One versioned endpoint, `POST /v1/analyze`, authenticated with a Google ID token
   "analysis_id": "b7e1...",
   "engine_version": "2.0.0",
   "verdict": "malicious",
+  "score": 100,
   "summary": "Likely credential phishing impersonating Microsoft.",
   "top_reasons": ["SENDER_LOOKALIKE_DOMAIN", "AUTH_DMARC_FAIL", "LINK_TEXT_MISMATCH"],
   "signals": [
@@ -240,41 +241,40 @@ Analyzers run concurrently with `asyncio.gather`, see only the shared `ParsedMes
 
 Catalog data (brands, shorteners, TLDs, keywords) lives in `backend/app/data/` so rules change without code changes.
 
-## 6. Verdict model (boolean checks only)
+## 6. Verdict and score model (yes/no rules)
 
-There is no numeric score. Every check is true or false, and the verdict comes from fixed rules over the signals that fired: one strong signal makes an email Suspicious, two strong signals or any critical one make it Malicious, and a confirmed threat-intel hit makes it Malicious on its own.
+The add-on shows a **score from 0 to 100** and a verdict. Neither is calculated: both come from one ordered list of yes/no questions over the signals that fired, and the first "yes" fixes the verdict and the score together, so they cannot disagree. The score is a class label, not a sum.
 
 **Algorithm (`backend/app/scoring.py`, the only place the rules live)**
 
-1. Collect the signals that fired; deduplicate by signal ID.
-2. If `CTX_TRUSTED_SENDER` fired **and** no `high`, `critical` or `confirmed` signal fired, ignore all `low` and `medium` signals. Any `high`, `critical` or `confirmed` signal voids the trust.
-3. Evaluate the verdict rules below in order; the first match wins.
-4. If the result would be Safe and any core analyzer (authentication, sender, links) failed, the verdict is `inconclusive`.
+1. Collect the signals that fired. `info` and `trust` signals never count.
+2. Evaluate the rules below in order; the first match wins.
 
-| Order | Verdict | Rule (boolean) |
+| Order | If this is true | Verdict | Score |
+|---|---|---|---|
+| 1 | Any `critical` signal | Malicious | 100 |
+| 2 | 2 or more `high` signals | Malicious | 90 |
+| 3 | 1 `high` signal | Suspicious | 60 |
+| 4 | Any `medium` signal | Suspicious | 40 |
+| 5 | A core analyzer (authentication, sender, links) failed or could not run | Inconclusive | none |
+| 6 | Any `low` signal | Safe | 10 |
+| 7 | Nothing fired | Safe | 0 |
+
+The card colors follow the score: 71-100 red, 31-70 amber, 0-30 green, gray when there is no score.
+
+| Example | Fired signals | Result |
 |---|---|---|
-| 1 | Malicious | Any `confirmed` signal, **or** any `critical` signal, **or** 2 or more `high` signals |
-| 2 | Suspicious | 1 `high` signal, **or** 2 or more `medium` signals |
-| 3 | Inconclusive | Rules 1 and 2 did not match and a core analyzer failed |
-| 4 | Safe | Everything else (low signals and a single medium are shown as notes, not escalated) |
+| DMARC aligned pass, nothing else | `AUTH_ALIGNED_PASS` (info) | Safe, 0 |
+| Only a note-level finding | `CONTENT_URGENCY` | Safe, 10 |
+| One medium | `SENDER_REPLYTO_MISMATCH` | Suspicious, 40 |
+| One high | `AUTH_DMARC_FAIL` | Suspicious, 60 |
+| Two highs | `AUTH_DMARC_FAIL` + `SENDER_DISPLAYNAME_EMAIL` | Malicious, 90 |
+| Known-bad link or file | `REP_BAD_DOMAIN` (critical) | Malicious, 100 |
+| Nothing fired, link analyzer failed | none, `links` failed | Inconclusive, no score |
 
-| Example | Fired signals | Verdict |
-|---|---|---|
-| DMARC aligned pass, nothing else | `AUTH_ALIGNED_PASS` (info) | Safe |
-| No evidence | none | Safe |
-| One medium | `SENDER_REPLYTO_MISMATCH` | Safe (shown as a note) |
-| Two mediums | `AUTH_SPF_FAIL` + `AUTH_DKIM_FAIL` | Suspicious |
-| One high | `AUTH_DMARC_FAIL` | Suspicious |
-| Two highs | `SENDER_LOOKALIKE_DOMAIN` + `LINK_TEXT_MISMATCH` | Malicious |
-| One critical | `AUTH_INTERNAL_SPOOF` | Malicious |
-| Confirmed threat intel | `REP_HASH_MALICIOUS` | Malicious |
-| Trusted sender with a medium | `CTX_TRUSTED_SENDER` + `SENDER_REPLYTO_MISMATCH` | Safe |
-| Trusted sender with a high | `CTX_TRUSTED_SENDER` + `AUTH_DMARC_FAIL` | Suspicious (trust voided) |
-| Nothing fired, link analyzer failed | none, `links` failed | Inconclusive |
+**Why this shape.** Yes/no rules are easy to explain and test: the card lists exactly which checks fired, and the result follows from a short table instead of tuned weights. A strong signal can never be diluted by many harmless ones. Only confirmed evidence (a critical signal from the blocklist) reaches 100, and an unknown never counts as safe. Inconclusive has no score because the risk is unknown.
 
-**Why this shape.** Boolean rules are easy to explain and test: the card lists exactly which checks failed, and the verdict follows from a short rule table instead of tuned weights. A strong signal can never be diluted by many harmless ones. Trust applies only to authenticated mail and is voided by any strong signal, so a spoofed "trusted sender" earns nothing.
-
-The rule table is the only calibration. It is tested against the fixture corpus (section 11), and any change to it bumps `engine_version`.
+The rule table is the only calibration. Any change to it bumps `engine_version`. The trusted-sender allowlist and the `confirmed` flag from earlier drafts are not built.
 
 ## 7. Add-on design and UX
 

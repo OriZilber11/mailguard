@@ -31,5 +31,6 @@ class Signal(BaseModel):
 class AnalyzeResponse(BaseModel):
     engine_version: str
     verdict: Verdict
+    score: int | None  # fixed class per rule (0-100); None when inconclusive
     summary: str
     signals: list[Signal]

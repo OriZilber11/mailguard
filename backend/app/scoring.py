@@ -1,14 +1,25 @@
+from collections import Counter
+from typing import NamedTuple
+
 from app.models import Signal, Verdict
 
 
-def decide(signals: list[Signal], core_failed: bool, confirmed: bool = False) -> Verdict:
-    """Boolean verdict rules (design section 6). The only place the rules live."""
-    count = {s: sum(1 for x in signals if x.severity == s) for s in ("medium", "high", "critical")}
+class Decision(NamedTuple):
+    verdict: Verdict
+    score: int | None  # None = could not be scored (inconclusive)
 
-    if confirmed or count["critical"] >= 1 or count["high"] >= 2:
-        return "malicious"
-    if count["high"] == 1 or count["medium"] >= 2:
-        return "suspicious"
-    if core_failed:
-        return "inconclusive"
-    return "safe"
+
+def decide(signals: list[Signal], core_failed: bool) -> Decision:
+    """Ordered yes/no rules, the first 'yes' wins. It fixes BOTH verdict and score, so they cannot disagree.
+    No arithmetic: the score is a class label. Info/trust signals are ignored."""
+    n = Counter(s.severity for s in signals)
+    rules = [
+        (n["critical"] >= 1, "malicious", 100),
+        (n["high"] >= 2,     "malicious", 90),
+        (n["high"] == 1,     "suspicious", 60),
+        (n["medium"] >= 1,   "suspicious", 40),
+        (core_failed,        "inconclusive", None),  # a core check could not run: never a false Safe
+        (n["low"] >= 1,      "safe", 10),
+        (True,               "safe", 0),
+    ]
+    return Decision(*next(r[1:] for r in rules if r[0]))
