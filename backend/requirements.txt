@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pytest
+tldextract
+google-auth
+requests
